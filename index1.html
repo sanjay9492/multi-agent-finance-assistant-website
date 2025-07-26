@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Finance Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Base styles for body and font */
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.5s ease, color 0.5s ease;
+            /* Default background for initial load, will be overridden by theme classes */
+            background-color: #0f172a; /* Fallback dark background */
+            position: relative; /* For overlay positioning */
+            min-height: 100vh; /* Ensure body takes full viewport height */
+            overflow-x: hidden; /* Prevent horizontal scroll */
+        }
+
+        /* Overlay to make background images subtle and enhance readability */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: -1; /* Behind content, above background image */
+            transition: background 0.5s ease;
+        }
+
+        /* Cursor light effect - subtle glow */
+        .cursor-light {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 400px; /* Slightly smaller */
+            height: 400px; /* Slightly smaller */
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: background 0.3s ease-out, transform 0.1s ease-out; /* Faster transform for responsiveness */
+            z-index: 10;
+            filter: blur(80px); /* More blur for a softer glow */
+        }
+
+        /* Shared Glass Card Styles */
+        .glass-card {
+            border-radius: 1.5rem;
+            transition: all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); /* Smoother cubic-bezier for liquid feel */
+            position: relative;
+            z-index: 1; /* Ensure glass cards are above the overlay */
+            overflow: hidden; /* Ensures content stays within rounded corners */
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1); /* Default subtle shadow */
+        }
+
+        /* Hover effect for glass cards - more pronounced lift and shadow */
+        .glass-card:hover {
+            transform: translateY(-12px) scale(1.02);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2); /* Deeper shadow on hover */
+        }
+
+        /* Icon Box Styling - for consistent sizing and centering */
+        .icon-box {
+            transition: all 0.3s ease;
+            border-radius: 9999px; /* Perfectly round */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 5rem; /* 80px */
+            height: 5rem; /* 80px */
+            margin: auto; /* Center the icon box */
+            margin-bottom: 1.5rem; /* Space below icon */
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08); /* Subtle shadow for depth */
+        }
+
+        /* Icon box hover effect when parent glass card is hovered */
+        .glass-card:hover .icon-box {
+            transform: translateY(-5px) scale(1.1); /* Lift and scale icon */
+            box-shadow: 0 10px 25px rgba(59, 130, 246, 0.3); /* Enhanced shadow for icon */
+        }
+
+        /* Primary Button Styling - with a subtle gradient and stronger hover */
+        .btn-primary {
+            color: white;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            padding: 0.85rem 2.5rem; /* Slightly larger padding */
+            border-radius: 0.75rem;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.15); /* Stronger initial shadow */
+            text-decoration: none;
+            display: inline-block;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: all 0.4s ease;
+            z-index: -1;
+        }
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        /* Primary button hover effect */
+        .btn-primary:hover {
+            transform: translateY(-4px) scale(1.05); /* More noticeable lift and scale */
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3); /* Deeper shadow on hover */
+        }
+
+        /* Header Specific Glass Effect - more prominent blur */
+        header.glass-card {
+            backdrop-filter: blur(40px) saturate(180%); /* Even stronger blur for header */
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border-bottom: 1px solid; /* Border will be colored by theme */
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); /* Lighter shadow for header */
+            transform: none !important; /* Override general glass-card hover */
+            box-shadow: none !important; /* Override general glass-card hover */
+            background: rgba(255, 255, 255, 0.08); /* Very subtle background for header */
+        }
+
+        /* Scroll Animations */
+        .scroll-animation {
+            opacity: 0;
+            transform: translateY(60px); /* Start from further down */
+            transition: opacity 1s ease-out, transform 1s ease-out; /* Slower, smoother animation */
+        }
+        .scroll-animation.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Theme Toggle Button Styling */
+        #theme-toggle {
+            width: 3.5rem; /* Increased size */
+            height: 3.5rem; /* Increased size */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px; /* Fully round */
+            background: rgba(255, 255, 255, 0.1); /* Subtle background for glass effect */
+            backdrop-filter: blur(15px);
+            -webkit-backdrop-filter: blur(15px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Theme Icon Styling and Animation */
+        #theme-toggle svg {
+            width: 2rem; /* Increased icon size */
+            height: 2rem; /* Increased icon size */
+            transition: transform 0.5s ease, opacity 0.5s ease; /* Smooth transition for rotation and fade */
+            position: absolute; /* Position for overlaying icons */
+        }
+
+        #theme-icon-light {
+            transform: rotate(0deg);
+            opacity: 1;
+        }
+
+        #theme-icon-dark {
+            transform: rotate(180deg); /* Start rotated for dark mode */
+            opacity: 0; /* Hidden initially for dark mode */
+        }
+
+        body.light-theme #theme-icon-light {
+            transform: rotate(-180deg); /* Rotate out for light mode */
+            opacity: 0;
+        }
+
+        body.light-theme #theme-icon-dark {
+            transform: rotate(0deg); /* Rotate in for light mode */
+            opacity: 1;
+        }
+
+        /* --- Light Mode Specific Styles --- */
+        body.light-theme {
+            background-image: url('https://images.unsplash.com/photo-1511884642898-4c92249e20b6?q=80&w=2070&auto=format&fit=crop'); /* Sun rising in mountains */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #1e293b; /* slate-800 */
+        }
+        body.light-theme .overlay {
+            background: linear-gradient(135deg, rgba(248, 250, 252, 0.02) 0%, rgba(226, 232, 240, 0.05) 100%); /* Even lighter overlay for max image visibility */
+        }
+        body.light-theme .glass-card {
+            background: rgba(255, 255, 255, 0.1); /* Even more transparent white */
+            backdrop-filter: blur(40px) saturate(180%); /* Stronger blur */
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.9); /* More visible, crisp border */
+            box-shadow: 0 20px 80px rgba(0, 0, 0, 0.3); /* Deeper shadow */
+        }
+        body.light-theme .glass-card:hover {
+            background: rgba(255, 255, 255, 0.25); /* Slightly less transparent on hover */
+            border-color: rgba(255, 255, 255, 1); /* Fully opaque border on hover */
+            box-shadow: 0 40px 90px rgba(0, 0, 0, 0.5); /* Even deeper shadow on hover */
+        }
+        body.light-theme .text-main { color: #0f172a; } /* slate-900 */
+        body.light-theme .text-secondary { color: #475569; } /* slate-600 */
+        body.light-theme .text-highlight { color: #2563eb; } /* blue-600 */
+        body.light-theme .icon-box {
+            background: rgba(59, 130, 246, 0.05); /* Lighter icon box background */
+            border: 1px solid rgba(59, 130, 246, 0.1);
+        }
+        body.light-theme .cursor-light { background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0) 80%); } /* Softer light */
+        body.light-theme .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+        }
+        body.light-theme header.glass-card {
+            border-bottom-color: rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.02); /* Even more transparent header */
+        }
+        body.light-theme #theme-toggle {
+            color: #0f172a; /* Ensure toggle icon is visible */
+        }
+
+        /* --- Dark Mode Specific Styles --- */
+        body.dark-theme {
+            background-image: url('https://images.unsplash.com/photo-1506748686214-e9df14d4d9d0?q=80&w=2070&auto=format&fit=crop'); /* New, more visible dark background image */
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #f8fafc; /* slate-50 */
+        }
+        body.dark-theme .overlay {
+            background: linear-gradient(135deg, rgba(2, 6, 23, 0.02) 0%, rgba(15, 23, 42, 0.05) 100%); /* Even lighter overlay for max image visibility */
+        }
+        body.dark-theme .glass-card {
+            background: rgba(2, 6, 23, 0.05); /* Even more transparent dark blue */
+            backdrop-filter: blur(40px) saturate(180%); /* Stronger blur */
+            -webkit-backdrop-filter: blur(40px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.5); /* More visible, crisp border */
+            box-shadow: 0 20px 80px rgba(0, 0, 0, 0.7); /* Deeper shadow */
+        }
+        body.dark-theme .glass-card:hover {
+            background: rgba(2, 6, 23, 0.15); /* Slightly less transparent on hover */
+            border-color: rgba(255, 255, 255, 0.7);
+            box-shadow: 0 40px 90px rgba(0, 0, 0, 1); /* Even deeper shadow on hover */
+        }
+        body.dark-theme .text-main { color: #ffffff; }
+        body.dark-theme .text-secondary { color: #cbd5e1; } /* slate-300 */
+        body.dark-theme .text-highlight { color: #60a5fa; } /* blue-400 */
+        body.dark-theme .icon-box {
+            background: rgba(59, 130, 246, 0.08); /* Lighter icon box background */
+            border: 1px solid rgba(59, 130, 246, 0.15);
+        }
+        body.dark-theme .cursor-light { background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, rgba(59, 130, 246, 0) 90%); } /* Softer light */
+        body.dark-theme .btn-primary {
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            border: 1px solid rgba(255, 255, 255, 0.55);
+        }
+        body.dark-theme header.glass-card {
+            border-bottom-color: rgba(255, 255, 255, 0.05);
+            background: rgba(2, 6, 23, 0.02); /* Even more transparent header */
+        }
+        body.dark-theme #theme-toggle {
+            color: #f8fafc; /* Ensure toggle icon is visible */
+        }
+    </style>
+</head>
+<body class="dark-theme"> <!-- Default to dark-theme on load, JS will adjust -->
+    <div class="overlay"></div>
+    <div class="cursor-light"></div>
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-20 glass-card">
+        <nav class="container mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+            <div class="text-xl font-bold text-main">Finance Assistant</div>
+            <button id="theme-toggle" class="p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                <!-- Sun Icon (for light mode) -->
+                <svg id="theme-icon-light" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <!-- Moon Icon (for dark mode) -->
+                <svg id="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9003 0 0012 21a9.003 9003 0 008.354-5.646z" />
+                </svg>
+            </button>
+        </nav>
+    </header>
+
+    <main class="relative z-10 container mx-auto px-4 py-16 sm:py-24">
+
+        <!-- Hero Section -->
+        <section class="text-center mb-24 scroll-animation">
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight text-main mb-6">
+                Multi-Agent <span class="text-highlight">Finance</span> Assistant
+            </h1>
+            <p class="text-lg sm:text-xl text-secondary max-w-3xl mx-auto">
+                Harnessing collaborative AI to demystify the stock market and deliver actionable, real-time financial insights.
+            </p>
+            <a href="https://multi-agent-finance-assistant-5rojpjijjvho3zy2le6etl.streamlit.app/" target="_blank" class="btn-primary font-semibold py-3 px-8 rounded-lg mt-10 text-lg">
+                Launch the Assistant
+            </a>
+        </section>
+
+        <!-- The "Why" Section -->
+        <section class="mb-28 scroll-animation">
+             <h2 class="text-3xl sm:text-4xl font-bold text-center mb-4 text-main">Bridging the Gap in Financial Analysis</h2>
+             <p class="text-center text-secondary max-w-3xl mx-auto mb-16">Existing platforms are powerful but often overwhelming. This project interprets complex data, not just displays it, making financial analysis accessible to everyone.</p>
+        </section>
+
+        <!-- How It Works Section -->
+        <section class="mb-28 scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">The Intelligent Workflow</h2>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <div class="icon-box"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg></div>
+                    <h3 class="text-2xl font-semibold mb-3 text-main">1. User Query</h3>
+                    <p class="text-secondary">The journey begins when a user inputs a stock ticker. This simple action triggers a complex, coordinated process.</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <div class="icon-box"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
+                    <h3 class="text-2xl font-semibold mb-3 text-main">2. Agent Delegation</h3>
+                    <p class="text-secondary">Specialized AI agents are dispatched to query APIs for company data, news, and live stock prices.</p>
+                </div>
+                <div class="glass-card p-8 rounded-2xl text-center">
+                    <div class="icon-box"><svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div>
+                    <h3 class="text-2xl font-semibold mb-3 text-main">3. AI Synthesis</h3>
+                    <p class="text-secondary">The Analytics Agent synthesizes the data into a coherent, insightful, and easy-to-read financial brief.</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Input Section -->
+        <section class="mb-28 scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">How You Interact: Input</h2>
+            <div class="max-w-3xl mx-auto glass-card p-8 rounded-2xl">
+                <h3 class="text-2xl font-semibold mb-4 text-highlight">Simple Ticker Input</h3>
+                <p class="text-secondary mb-4">The Multi-Agent Finance Assistant is designed for ease of use. Your interaction begins with a straightforward input: the **stock ticker symbol** of the company you're interested in.</p>
+                <ul class="list-disc list-inside text-secondary space-y-2 mb-6">
+                    <li>**Direct and Intuitive:** No complex commands or lengthy forms. Just type the ticker (e.g., <code class="text-highlight font-mono">AAPL</code> for Apple, <code class="text-highlight font-mono">GOOGL</code> for Google, <code class="text-highlight font-mono">MSFT</code> for Microsoft).</li>
+                    <li>**Focus on Specificity:** By providing a ticker, you direct our specialized AI agents to gather precise, relevant data for that particular company.</li>
+                    <li>**Future Enhancements:** We plan to introduce voice input support, allowing you to simply speak the ticker symbol for even quicker analysis.</li>
+                </ul>
+                <p class="text-secondary">This streamlined input ensures you can quickly get the financial insights you need without any unnecessary hurdles.</p>
+            </div>
+        </section>
+
+        <!-- Processing Section -->
+        <section class="mb-28 scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">Behind the Scenes: Intelligent Processing</h2>
+            <div class="max-w-3xl mx-auto glass-card p-8 rounded-2xl">
+                <h3 class="text-2xl font-semibold mb-4 text-highlight">The Multi-Agent System at Work</h3>
+                <p class="text-secondary mb-4">Once you provide a stock ticker, our sophisticated multi-agent system springs into action. Each agent has a specific role, working collaboratively to gather and process comprehensive financial data.</p>
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h4 class="text-xl font-semibold text-main mb-2">Data Collection Agents</h4>
+                        <ul class="list-disc list-inside text-secondary space-y-1">
+                            <li>**Company Data Agent:** Queries APIs (e.g., Alpha Vantage) for fundamental company information, financial statements, and historical data.</li>
+                            <li>**News Aggregation Agent:** Scans reputable financial news sources and APIs for the latest headlines and sentiment related to the specified ticker.</li>
+                            <li>**Live Price Agent:** Fetches real-time stock price data and key trading metrics (e.g., from yFinance).</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-semibold text-main mb-2">Analysis & Synthesis Agent</h4>
+                        <ul class="list-disc list-inside text-secondary space-y-1">
+                            <li>**Data Integration:** Combines all collected data points, ensuring consistency and accuracy.</li>
+                            <li>**AI-Powered Interpretation:** Leverages Google Gemini's advanced capabilities to interpret complex financial jargon, identify trends, and extract key insights from the raw data.</li>
+                            <li>**Brief Generation:** Structures the interpreted information into a coherent, easy-to-understand financial brief, ready for presentation.</li>
+                        </ul>
+                    </div>
+                </div>
+                <p class="text-secondary">This modular approach ensures efficiency, accuracy, and the ability to handle diverse data sources, providing a holistic view of the stock.</p>
+            </div>
+        </section>
+
+        <!-- Output Section -->
+        <section class="mb-28 scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">What You Get: Actionable Insights</h2>
+            <div class="max-w-3xl mx-auto glass-card p-8 rounded-2xl">
+                <h3 class="text-2xl font-semibold mb-4 text-highlight">Your Personalized Financial Brief</h3>
+                <p class="text-secondary mb-4">The ultimate output of the Multi-Agent Finance Assistant is a concise yet comprehensive financial brief, tailored to your query. It's designed to cut through the noise and provide you with actionable insights.</p>
+                <ul class="list-disc list-inside text-secondary space-y-2 mb-6">
+                    <li>**Key Performance Indicators (KPIs):** Get a quick overview of essential metrics like current stock price, daily change, market capitalization, P/E ratio, and dividend yield.</li>
+                    <li>**Recent News Summary:** A distilled summary of the most impactful news articles related to the company, highlighting potential influences on its stock performance.</li>
+                    <li>**AI-Driven Analysis:** An interpretive summary from our Analytics Agent, explaining what the numbers and news mean for the stock's current standing and potential future outlook. This includes insights on market sentiment, industry trends, and competitive landscape.</li>
+                    <li>**Easy to Understand:** Complex financial data is translated into plain language, making it accessible even if you're not a financial expert.</li>
+                    <li>**Future Enhancements:** We are working on features like PDF report downloads for easy sharing and comparative analysis to evaluate multiple stocks side-by-side.</li>
+                </ul>
+                <p class="text-secondary">Our goal is to empower you with clear, intelligent financial information, enabling more informed decision-making.</p>
+            </div>
+        </section>
+
+        <!-- Technology Stack Section -->
+        <section class="mb-28 scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">Technology Stack</h2>
+            <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-8">
+                <div class="glass-card p-6 rounded-2xl text-center">
+                    <h3 class="text-xl font-semibold mb-2 text-main">Python</h3>
+                    <p class="text-secondary text-sm sm:text-base">Core backend logic and agent coordination.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center">
+                    <h3 class="text-xl font-semibold mb-2 text-main">Streamlit</h3>
+                    <p class="text-secondary text-sm sm:text-base">Interactive web application frontend.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center">
+                    <h3 class="text-xl font-semibold mb-2 text-main">Google Gemini</h3>
+                    <p class="text-secondary text-sm sm:text-base">AI-powered data analysis and summary generation.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl text-center">
+                    <h3 class="text-xl font-semibold mb-2 text-main">APIs</h3>
+                    <p class="text-secondary text-sm sm:text-base">Alpha Vantage & yFinance for real-time data.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Challenges & Solutions Section -->
+        <section class="mb-28 scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">Challenges & Solutions</h2>
+            <div class="max-w-4xl mx-auto space-y-6">
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-xl font-semibold mb-2 text-highlight">Unreliable Data Scraping</h3>
+                    <p class="text-secondary">Initial attempts to scrape data were blocked. Pivoted to official, stable APIs like yFinance, ensuring reliable and sanctioned data access.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-xl font-semibold mb-2 text-highlight">API Rate Limiting</h3>
+                    <p class="text-secondary">Alpha Vantage has strict usage limits. Implemented robust error handling and retry logic, making the application more resilient.</p>
+                </div>
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-xl font-semibold mb-2 text-highlight">Inconsistent AI Output</h3>
+                    <p class="text-secondary">The AI's initial summaries varied. Solved through meticulous prompt engineering, creating a template that guides the AI to produce consistent results.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Future Enhancements Section -->
+        <section class="scroll-animation">
+            <h2 class="text-3xl sm:text-4xl font-bold text-center mb-16 text-main">The Road Ahead</h2>
+            <div class="max-w-4xl mx-auto grid sm:grid-cols-2 gap-8">
+                <div class="glass-card p-6 rounded-2xl flex items-center space-x-4">
+                    <div class="icon-box w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg></div>
+                    <div><h3 class="text-lg font-semibold text-main">PDF Report Download</h3><p class="text-secondary text-sm">Export the generated brief as a PDF.</p></div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl flex items-center space-x-4">
+                    <div class="icon-box w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg></div>
+                    <div><h3 class="text-lg font-semibold text-main">Voice Input Support</h3><p class="text-secondary text-sm">Speak a ticker symbol to start analysis.</p></div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl flex items-center space-x-4">
+                    <div class="icon-box w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg></div>
+                    <div><h3 class="text-lg font-semibold text-main">Comparative Analysis</h3><p class="text-secondary text-sm">Compare key metrics for multiple stocks.</p></div>
+                </div>
+                <div class="glass-card p-6 rounded-2xl flex items-center space-x-4">
+                    <div class="icon-box w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-highlight" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg></div>
+                    <div><h3 class="text-lg font-semibold text-main">Personalized Portfolios</h3><p class="text-secondary text-sm">Implement user accounts to save stocks.</p></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const body = document.body;
+            const themeToggle = document.getElementById('theme-toggle');
+            const lightIcon = document.getElementById('theme-icon-light');
+            const darkIcon = document.getElementById('theme-icon-dark');
+
+            // Function to apply the theme
+            const applyTheme = (isDark) => {
+                if (isDark) {
+                    body.classList.remove('light-theme');
+                    body.classList.add('dark-theme');
+                    lightIcon.style.transform = 'rotate(-180deg)'; // Rotate out light icon
+                    lightIcon.style.opacity = '0';
+                    darkIcon.style.transform = 'rotate(0deg)'; // Rotate in dark icon
+                    darkIcon.style.opacity = '1';
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    body.classList.remove('dark-theme');
+                    body.classList.add('light-theme');
+                    lightIcon.style.transform = 'rotate(0deg)'; // Rotate in light icon
+                    lightIcon.style.opacity = '1';
+                    darkIcon.style.transform = 'rotate(180deg)'; // Rotate out dark icon
+                    darkIcon.style.opacity = '0';
+                    localStorage.setItem('theme', 'light');
+                }
+            };
+
+            // Toggle theme on button click
+            themeToggle.addEventListener('click', () => {
+                const isDark = body.classList.contains('dark-theme');
+                applyTheme(!isDark);
+            });
+
+            // Set initial theme based on localStorage, then system preference, then time of day
+            const storedTheme = localStorage.getItem('theme');
+            if (storedTheme) {
+                applyTheme(storedTheme === 'dark');
+            } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                applyTheme(true); // System prefers dark
+            } else {
+                // Determine theme based on time of day if no preference found
+                const currentHour = new Date().getHours();
+                // Define day as 6 AM to 6 PM (18:00)
+                const isDayTime = currentHour >= 6 && currentHour < 18;
+                applyTheme(!isDayTime); // Apply dark theme if it's not day time
+            }
+        });
+
+        // Cursor light effect
+        document.addEventListener('mousemove', e => {
+            const light = document.querySelector('.cursor-light');
+            if (light) {
+                light.style.left = e.clientX + 'px';
+                light.style.top = e.clientY + 'px';
+            }
+        });
+
+        // Scroll animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                } else {
+                    // Optional: remove 'visible' class when out of view if you want re-animation on scroll back
+                    entry.target.classList.remove('visible');
+                }
+            });
+        }, {
+            threshold: 0.1 // Trigger when 10% of the element is visible
+        });
+
+        document.querySelectorAll('.scroll-animation').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>
